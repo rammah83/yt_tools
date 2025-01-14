@@ -129,7 +129,7 @@ def save_data_to_csv(video_urls, output_file="./output/playlist_extracted_links.
         video_urls (list): List of video URLs to process
         output_file (str): Path to output CSV file
     """
-    with open(output_file, mode="w", newline="", encoding="utf-8") as csvfile:
+    with open(output_file, mode="w", newline="", encoding="utf-16") as csvfile:
         writer = csv.writer(csvfile)
         # Write the CSV header row
         writer.writerow(["video_url", "title", "text", "link"])
