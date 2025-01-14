@@ -1,14 +1,16 @@
 # generate_links_from_playlist.py
 # Created/Modified files during execution:
 
+import csv
 import re
-import json
-from pytube import Playlist
-from pytube import YouTube
+
+from pytube import Playlist, YouTube
+from tqdm import tqdm
 
 print("generate_links_from_playlist.py")
 
-def extract_videos_from_playlist(playlist_url, limit:int|None=3):
+
+def videos_urls_from_playlist(playlist_url, limit: int | None = None):
     """
     Fetches a list of video URLs from the specified YouTube playlist.
 
@@ -16,13 +18,14 @@ def extract_videos_from_playlist(playlist_url, limit:int|None=3):
     :param limit: Maximum number of videos to extract
     :return: List of video URLs
     """
-    if limit is not None:
-        playlist = Playlist(playlist_url)
-        return list(playlist.video_urls)[:limit]
     playlist = Playlist(playlist_url)
-    return list(playlist.video_urls)
+    if limit is not None:
+        limit = min(limit, len(playlist.video_urls))
+        return playlist.video_urls[:limit]
+    return playlist.video_urls
 
-def get_video_details(video_url):
+
+def get_video_title_desc(video_url):
     """
     Retrieve the title and description for a given YouTube video.
 
@@ -31,6 +34,7 @@ def get_video_details(video_url):
     """
     yt = YouTube(video_url)
     return yt.title, yt.description
+
 
 def extract_line_links(description):
     """
@@ -74,12 +78,12 @@ def extract_line_links(description):
     """
     links_data = []
     # Split description into lines
-    lines = description.split('\n')
+    lines = description.split("\n")
 
     # Regex to find any http/https URL
-    url_pattern = re.compile(r'(https?://[^\s]+)')
+    url_pattern = re.compile(r"(https?://[^\s]+)")
 
-    for line in lines:
+    for line in tqdm(lines, leave=False):
         # Find all occurrences of URLs in the line
         matches = list(url_pattern.finditer(line))
         if not matches:
@@ -92,11 +96,8 @@ def extract_line_links(description):
             url = match.group(1)
 
             # Text before the link
-            text_before = line[start_index:match.start()].strip()
-            links_data.append({
-                'text': text_before,
-                'link': url
-            })
+            text_before = line[start_index : match.start()].strip()
+            links_data.append({"text": text_before, "link": url})
             start_index = match.end()
 
         # Optionally, capturing leftover text after the last link, if needed
@@ -106,3 +107,40 @@ def extract_line_links(description):
         #     ...
 
     return links_data
+
+
+def extract_all_lines_links(video_url):
+    """sumary_line
+
+    Keyword arguments:
+    argument -- description
+    Return: return_description
+    """
+    title, description = get_video_title_desc(video_url)
+    links = extract_line_links(description)
+    return {"title": title, "video_url": video_url, "links": links}
+
+
+def save_data_to_csv(video_urls, output_file="./output/playlist_extracted_links.csv"):
+    """
+    Save video links and details to a CSV file.
+
+    Args:
+        video_urls (list): List of video URLs to process
+        output_file (str): Path to output CSV file
+    """
+    with open(output_file, mode="w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        # Write the CSV header row
+        writer.writerow(["video_url", "title", "text", "link"])
+
+        for video_url in tqdm(video_urls, desc="Extracting links from videos"):
+            title, description = get_video_title_desc(video_url)
+            links = extract_line_links(description)
+
+            for link_info in tqdm(links, desc=f"{title}", leave=False):
+                writer.writerow(
+                    [video_url, title, link_info["text"], link_info["link"]]
+                )
+
+    print(f"Data extracted and saved to {output_file}")
